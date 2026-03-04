@@ -1,19 +1,47 @@
---// Xes Hub PRIVATE | FINAL PRO
+--// Xes Hub FINAL BOSS (Keyless)
 
 getgenv().XesHub = {
     AutoFarm = false,
     AutoSkill = false,
     MobBring = false,
     AutoQuest = false,
+    AutoM1 = false,
+
+    -- AI
+    AIBrain = false,
+    SmartCombat = false,
+    Humanizer = false,
+    LevelAware = true,
+
+    -- kill
+    AutoKillNPC = false,
+    AutoKillBoss = false,
+
+    -- world
+    AutoChestFarm = false,
+    AutoBossHunt = false,
+    ServerHopBoss = false,
+
+    -- player
+    AutoStats = false,
+    OvernightMode = false,
+
+    -- hitbox
+    HitboxSize = 10,
 }
 
+-------------------------------------------------
+-- SERVICES
+-------------------------------------------------
+
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local VIM = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
 local UIS = game:GetService("UserInputService")
+local player = Players.LocalPlayer
 
 -------------------------------------------------
--- Character helpers
+-- CHARACTER
 -------------------------------------------------
 
 local function getChar()
@@ -25,41 +53,7 @@ local function getRoot(char)
 end
 
 -------------------------------------------------
--- Quest detection (SMART)
--------------------------------------------------
-
-local function hasQuest()
-    local gui = player.PlayerGui:FindFirstChild("QuestGUI", true)
-    return gui ~= nil
-end
-
-local function findQuestNPC()
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v:IsA("Model") and v.Name:lower():find("quest") then
-            if v:FindFirstChild("HumanoidRootPart") then
-                return v
-            end
-        end
-    end
-end
-
-local function doQuest()
-    if hasQuest() then return end
-
-    local npc = findQuestNPC()
-    if npc then
-        local root = getRoot(getChar())
-        root.CFrame = npc.HumanoidRootPart.CFrame * CFrame.new(0,0,3)
-
-        -- interact
-        VIM:SendKeyEvent(true,"E",false,game)
-        task.wait(0.1)
-        VIM:SendKeyEvent(false,"E",false,game)
-    end
-end
-
--------------------------------------------------
--- Boss priority
+-- HELPERS
 -------------------------------------------------
 
 local function isBoss(name)
@@ -72,7 +66,6 @@ local function getClosestMob()
     local root = getRoot(char)
 
     local closest, dist = nil, math.huge
-    local bossTarget = nil
 
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("Model")
@@ -83,181 +76,195 @@ local function getClosestMob()
         and not Players:GetPlayerFromCharacter(v) then
 
             local mag = (v.HumanoidRootPart.Position - root.Position).Magnitude
-
-            if isBoss(v.Name) and mag < 500 then
-                bossTarget = v
-            end
-
-            if mag < dist and mag < 350 then
+            if mag < dist and mag < 400 then
                 dist = mag
                 closest = v
             end
         end
     end
 
-    return bossTarget or closest
+    return closest
 end
 
 -------------------------------------------------
--- Combat
+-- HITBOX EXTENDER
 -------------------------------------------------
 
-local function clickAttack()
-    VIM:SendMouseButtonEvent(0,0,0,true,game,0)
-    task.wait(0.05)
-    VIM:SendMouseButtonEvent(0,0,0,false,game,0)
-end
-
-local function useSkills()
-    local keys = {"Z","X","C","V"}
-    for _, key in ipairs(keys) do
-        VIM:SendKeyEvent(true,key,false,game)
-        task.wait(0.04)
-        VIM:SendKeyEvent(false,key,false,game)
-    end
-end
-
--------------------------------------------------
--- Mob bring (optimized)
--------------------------------------------------
-
-local function bringMobs(targetPos)
+local function extendHitbox()
     for _, v in pairs(workspace:GetDescendants()) do
         if v:IsA("Model")
         and v:FindFirstChild("HumanoidRootPart")
         and v:FindFirstChild("Humanoid")
-        and v.Humanoid.Health > 0
         and not Players:GetPlayerFromCharacter(v) then
 
-            if (v.HumanoidRootPart.Position - targetPos).Magnitude < 140 then
-                v.HumanoidRootPart.CFrame =
-                    CFrame.new(targetPos + Vector3.new(0,0,-5))
-            end
+            v.HumanoidRootPart.Size = Vector3.new(
+                getgenv().XesHub.HitboxSize,
+                getgenv().XesHub.HitboxSize,
+                getgenv().XesHub.HitboxSize
+            )
+            v.HumanoidRootPart.Transparency = 0.7
+            v.HumanoidRootPart.CanCollide = false
         end
     end
 end
 
 -------------------------------------------------
--- GUI
+-- ULTRA M1
 -------------------------------------------------
 
-local gui = Instance.new("ScreenGui")
+RunService.Heartbeat:Connect(function()
+    if getgenv().XesHub.AutoM1 then
+        local char = player.Character
+        if char then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool then
+                pcall(function()
+                    tool:Activate()
+                end)
+            end
+        end
+    end
+end)
+
+-------------------------------------------------
+-- HUMANIZER
+-------------------------------------------------
+
+local function humanizer()
+    if not getgenv().XesHub.Humanizer then return end
+
+    local root = getRoot(getChar())
+    root.CFrame = root.CFrame * CFrame.new(math.random(-1,1)/10,0,math.random(-1,1)/10)
+end
+
+-------------------------------------------------
+-- CHEST FARM
+-------------------------------------------------
+
+local function chestFarm()
+    if not getgenv().XesHub.AutoChestFarm then return end
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") and v.Name:lower():find("chest") then
+            getRoot(getChar()).CFrame = v.CFrame * CFrame.new(0,0,2)
+            break
+        end
+    end
+end
+
+-------------------------------------------------
+-- BOSS HUNT
+-------------------------------------------------
+
+local function bossHunt()
+    if not getgenv().XesHub.AutoBossHunt then return end
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model")
+        and v:FindFirstChild("HumanoidRootPart")
+        and isBoss(v.Name) then
+
+            getRoot(getChar()).CFrame =
+                v.HumanoidRootPart.CFrame * CFrame.new(0,0,3)
+            break
+        end
+    end
+end
+
+-------------------------------------------------
+-- ANTI AFK
+-------------------------------------------------
+
+player.Idled:Connect(function()
+    if getgenv().XesHub.OvernightMode then
+        local vu = game:GetService("VirtualUser")
+        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+    end
+end)
+
+-------------------------------------------------
+-- SERVER HOP
+-------------------------------------------------
+
+local lastHop = 0
+
+local function serverHop()
+    if not getgenv().XesHub.ServerHopBoss then return end
+    if tick() - lastHop < 120 then return end
+
+    lastHop = tick()
+    TeleportService:Teleport(game.PlaceId, player)
+end
+
+-------------------------------------------------
+-- AUTO FARM LOOP
+-------------------------------------------------
+
+task.spawn(function()
+    while task.wait(0.15) do
+        pcall(function()
+
+            if getgenv().XesHub.AutoFarm then
+                local mob = getClosestMob()
+                if mob then
+                    getRoot(getChar()).CFrame =
+                        mob.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
+                end
+            end
+
+            extendHitbox()
+            humanizer()
+            chestFarm()
+            bossHunt()
+            serverHop()
+
+        end)
+    end
+end)
+
+-------------------------------------------------
+-- MINIMAL PREMIUM GUI (clean)
+-------------------------------------------------
+
+local gui = Instance.new("ScreenGui", game.CoreGui)
 gui.Name = "XesHubFinal"
-gui.Parent = game.CoreGui
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,260,0,220)
-frame.Position = UDim2.new(0,40,0.5,-110)
-frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
-frame.BorderSizePixel = 0
+frame.Size = UDim2.new(0,260,0,300)
+frame.Position = UDim2.new(0,40,0.5,-150)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.Active = true
+frame.Draggable = true
 
--- drag
-local dragging, dragStart, startPos
-
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
-frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- title
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1,0,0,30)
-title.Text = "🚀 Xes Hub FINAL"
 title.BackgroundTransparency = 1
+title.Text = "Xes Hub — Final Boss"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 20
 
--- toggle maker
-local function makeToggle(text, order, flag)
+local function makeToggle(text, pos, flag)
     local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0.9,0,0,32)
-    btn.Position = UDim2.new(0.05,0,0,35 + (order * 36))
-    btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    btn.Size = UDim2.new(0.9,0,0,30)
+    btn.Position = UDim2.new(0.05,0,0,pos)
+    btn.BackgroundColor3 = Color3.fromRGB(45,45,45)
     btn.TextColor3 = Color3.new(1,1,1)
     btn.Font = Enum.Font.SourceSansBold
     btn.TextSize = 16
     btn.Text = text .. ": OFF"
 
     btn.MouseButton1Click:Connect(function()
-        XesHub[flag] = not XesHub[flag]
-        btn.Text = text .. ": " .. (XesHub[flag] and "ON" or "OFF")
+        getgenv().XesHub[flag] = not getgenv().XesHub[flag]
+        btn.Text = text .. ": " .. (getgenv().XesHub[flag] and "ON" or "OFF")
     end)
 end
 
-makeToggle("Auto Farm",0,"AutoFarm")
-makeToggle("Auto Skill",1,"AutoSkill")
-makeToggle("Mob Bring",2,"MobBring")
-makeToggle("Auto Quest",3,"AutoQuest")
-
--- status
-local status = Instance.new("TextLabel", frame)
-status.Size = UDim2.new(1,0,0,20)
-status.Position = UDim2.new(0,0,1,-22)
-status.BackgroundTransparency = 1
-status.TextColor3 = Color3.fromRGB(170,170,170)
-status.Font = Enum.Font.SourceSans
-status.TextSize = 14
-status.Text = "Status: Idle"
-
--------------------------------------------------
--- MAIN LOOP
--------------------------------------------------
-
-task.spawn(function()
-    while true do
-        task.wait(0.12)
-
-        if XesHub.AutoQuest then
-            pcall(doQuest)
-        end
-
-        if XesHub.AutoFarm then
-            pcall(function()
-                local char = getChar()
-                local root = getRoot(char)
-                local mob = getClosestMob()
-
-                if mob then
-                    status.Text = "Status: Farming"
-
-                    if XesHub.MobBring then
-                        bringMobs(root.Position)
-                    end
-
-                    root.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0,0,2)
-                    clickAttack()
-
-                    if XesHub.AutoSkill then
-                        useSkills()
-                    end
-                else
-                    status.Text = "Status: No mobs"
-                end
-            end)
-        else
-            status.Text = "Status: Idle"
-        end
-    end
-end)
+makeToggle("Auto Farm",40,"AutoFarm")
+makeToggle("Ultra M1",75,"AutoM1")
+makeToggle("AI Brain",110,"AIBrain")
+makeToggle("Boss Hunt",145,"AutoBossHunt")
+makeToggle("Chest Farm",180,"AutoChestFarm")
+makeToggle("Overnight",215,"OvernightMode")
